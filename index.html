@@ -76,6 +76,10 @@ h2{font-size:15px;color:var(--mut);margin:20px 0 8px;font-weight:600}
 .pulse{animation:p 1s infinite}
 @keyframes p{50%{opacity:.5}}
 .warn{background:#422006;color:#fed7aa;border-radius:12px;padding:10px 12px;font-size:13px;margin-bottom:12px}
+#mv{position:fixed;right:0;bottom:0;width:1px;height:1px;opacity:0;pointer-events:none}
+#mv.in{position:static;width:auto;height:auto;max-width:92%;max-height:30vh;opacity:1;border-radius:12px;background:#000;pointer-events:auto}
+.vslot{display:flex;justify-content:center;width:100%}
+input[type=file]{width:100%;margin:6px 0;color:var(--mut);font-size:14px}
 </style>
 </head>
 <body>
@@ -84,6 +88,7 @@ h2{font-size:15px;color:var(--mut);margin:20px 0 8px;font-weight:600}
   <nav id="nav"></nav>
 </div>
 <div id="sess"></div>
+<video id="mv" playsinline webkit-playsinline preload="auto"></video>
 
 <script>
 'use strict';
@@ -108,7 +113,13 @@ const store = {
     const q = this.db.transaction('kv').objectStore('kv').get(k); q.onsuccess = () => res(q.result ?? null); q.onerror = () => res(null); }); },
   set(k, v) { return new Promise(res => {
     if (!this.db) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} res(); return; }
-    const t = this.db.transaction('kv', 'readwrite'); t.objectStore('kv').put(v, k); t.oncomplete = () => res(); t.onerror = () => res(); }); }
+    const t = this.db.transaction('kv', 'readwrite'); t.objectStore('kv').put(v, k); t.oncomplete = () => res(); t.onerror = () => res(); }); },
+  setBlob(k, b) { return new Promise(res => {
+    if (!this.db) return res(false);
+    try { const t = this.db.transaction('kv', 'readwrite'); t.objectStore('kv').put(b, k); t.oncomplete = () => res(true); t.onerror = () => res(false); t.onabort = () => res(false); } catch (e) { res(false); } }); },
+  del(k) { return new Promise(res => {
+    if (!this.db) { try { localStorage.removeItem(k); } catch (e) {} return res(); }
+    const t = this.db.transaction('kv', 'readwrite'); t.objectStore('kv').delete(k); t.oncomplete = () => res(); t.onerror = () => res(); }); }
 };
 
 /* ---------- starter content ---------- */
@@ -134,10 +145,10 @@ const SEED = [
   ['vi', 'Cái này giá bao nhiêu?', '這個多少錢？'],
   ['vi', 'Nhà vệ sinh ở đâu?', '廁所在哪裡？']
 ];
-const newCard = (lang, text, zh, note = '') => ({ id: uid(), lang, text, zh, note, ease: 2.5, interval: 0, reps: 0, due: 0, isNew: true });
+const newCard = (lang, text, zh, note = '', extra = {}) => Object.assign({ id: uid(), lang, text, zh, note, ease: 2.5, interval: 0, reps: 0, due: 0, isNew: true }, extra);
 
 /* ---------- state ---------- */
-let S = null, view = 'home', sess = null, voices = [];
+let S = null, view = 'home', sess = null, voices = [], impLang = 'ja';
 const save = () => store.set('state', S);
 const defaults = () => ({ v: 1, cards: SEED.map(a => newCard(...a)), log: {}, goal: 5, rate: 0.9, lang: 'all', steps: [...STEP_ORDER], voice: { ja: '', vi: '' } });
 
@@ -204,14 +215,18 @@ function vHome() {
 
 function vCards() {
   const p = pools(), t = today();
-  const list = p.all.map(c => `<div class="item"><div class="row"><span class="tag ${c.lang}">${LANG[c.lang].tag}</span><span class="mut">${c.isNew ? '新' : c.due <= t ? '到期' : fmtDays(c.due - t) + '後'}</span><div class="sp"></div>
+  const list = p.all.map(c => `<div class="item"><div class="row"><span class="tag ${c.lang}">${LANG[c.lang].tag}</span>${c.mid ? '<span class="mut">🎬</span>' : ''}<span class="mut">${c.isNew ? '新' : c.due <= t ? '到期' : fmtDays(c.due - t) + '後'}</span><div class="sp"></div>
     <button class="sm ghost" data-act="del" data-id="${c.id}">${S.confirmDel === c.id ? '再點一次刪除' : '刪除'}</button></div>
     <div class="t">${ruby(c.text)}</div><div class="mut">${esc(c.zh)}${c.note ? ' · ' + esc(c.note) : ''}</div></div>`).join('');
   return `<h1>句庫</h1>${langChips()}
   <div class="card"><b>匯入句子</b><div class="mut" style="margin:6px 0 10px">每行一句：外文 | 中文 | 備註（可省略）<br>日文漢字後可加讀音，例如 納期{のうき}はいつですか。</div>
-    <select id="impLang"><option value="ja">日文</option><option value="vi">越文</option></select><div style="height:8px"></div>
+    <select id="impLang" data-act="impLang">${['ja', 'vi'].map(l => `<option value="${l}" ${impLang === l ? 'selected' : ''}>${LANG[l].name}</option>`).join('')}</select><div style="height:8px"></div>
     <textarea id="impText" placeholder="Xin chào | 你好&#10;お願{ねが}いします | 拜託了"></textarea><div style="height:8px"></div>
     <div class="row"><button class="pri" data-act="import">匯入</button><button data-act="prompt">複製 AI 提示詞</button></div><div class="mut" id="impMsg" style="margin-top:8px"></div></div>
+  <div class="card"><b>影片／音檔＋字幕（SRT）</b><div class="mut" style="margin:6px 0 8px">跟讀時會播放影片裡的真人原音。語言用上面的選項。字幕每則：第 1 行外文、第 2 行中文、第 3 行備註（可省略）。已有的相同句子會直接連結，進度保留。</div>
+    <div class="mut">① 選影片或音檔</div><input type="file" id="mvFile" accept="video/*,audio/*">
+    <div class="mut">② 選字幕檔，或貼上內容</div><input type="file" id="srtFile"><textarea id="srtText" placeholder="1&#10;00:00:05,000 --> 00:00:08,000&#10;Xin chào&#10;你好"></textarea><div style="height:8px"></div>
+    <button class="pri" data-act="importMedia">匯入影片＋字幕</button><div class="mut" id="mvMsg" style="margin-top:8px"></div></div>
   <h2>共 ${p.all.length} 句</h2>${list || '<div class="mut">目前沒有句子</div>'}`;
 }
 
@@ -236,7 +251,7 @@ function vSettings() {
   <h2>預設語速</h2><div class="chips">${[[0.7, '慢'], [0.9, '正常'], [1.1, '快']].map(([r, n]) => `<div class="chip ${S.rate === r ? 'on' : ''}" data-act="rate" data-r="${r}">${n}</div>`).join('')}</div>
   <h2>訓練步驟（至少留一個）</h2><div class="card">${STEP_ORDER.map(s => `<label class="switch"><span>${STEPS[s]}</span><input type="checkbox" data-act="step" data-s="${s}" ${S.steps.includes(s) ? 'checked' : ''}></label>`).join('')}</div>
   ${sel('ja')}${sel('vi')}
-  <h2>備份與還原</h2><div class="card"><div class="mut" style="margin-bottom:8px">資料只存在這支手機的瀏覽器裡。換機或清除網站資料前請先備份。</div>
+  <h2>備份與還原</h2><div class="card"><div class="mut" style="margin-bottom:8px">資料只存在這支手機的瀏覽器裡。換機或清除網站資料前請先備份。備份不含影片檔，換機後句子與進度會保留，影片需重新匯入。</div>
     <div class="row"><button data-act="bkShow">顯示備份</button><button data-act="bkCopy">複製備份</button></div><div style="height:8px"></div>
     <textarea id="bk" placeholder="備份內容會顯示在這裡；要還原就把備份貼進來再按「還原」"></textarea><div style="height:8px"></div>
     <div class="row"><button class="pri" data-act="bkRestore">還原</button><div class="mut" id="bkMsg"></div></div></div>
@@ -244,8 +259,10 @@ function vSettings() {
 }
 
 /* ---------- session ---------- */
-function startSession() {
+async function startSession() {
   const q = buildQueue(); if (!q.length) return;
+  const ids = [...new Set(q.map(c => c.mid).filter(Boolean))];
+  if (ids.length) { await loadMedia(ids); await prepMedia(q[0]); }
   sess = { q, i: 0, step: 0, rev: false, slow: false, rating: false, done: 0, retry: new Set(), myURL: null, rec: null, recStream: null, recErr: '' };
   $('#sess').classList.add('on'); enterStep(true);
 }
@@ -255,9 +272,10 @@ function enterStep(autoplay) {
   sess.rev = false; sess.recErr = '';
   const st = S.steps[sess.step];
   renderSess();
-  if (autoplay && (st === 'listen' || st === 'read' || st === 'shadow')) speak(cur().text, cur().lang, rate());
+  if (autoplay && (st === 'listen' || st === 'read' || st === 'shadow')) playCard(cur());
 }
-function renderSess() {
+function renderSess() { parkVideo(); renderSessInner(); placeVideo(); }
+function renderSessInner() {
   const el = $('#sess');
   if (sess.finished) {
     el.innerHTML = `<div class="sb"><div class="ico">🎉</div><div class="fx" style="font-size:24px">完成 ${sess.done} 句</div><div class="mut">連續 ${streak()} 天</div></div><div class="sf"><button class="pri sp" data-act="exit">回首頁</button><button class="sp" data-act="again">再來一輪</button></div>`; return;
@@ -270,6 +288,7 @@ function renderSess() {
       <div class="rate">${b.map(([q, n, col]) => `<button data-act="grade" data-q="${q}" style="background:${col};color:#0b1222">${n}<small>${fmtDays(sm2(c, q).interval)}後</small></button>`).join('')}</div>`; return;
   }
   const st = S.steps[sess.step]; let body = '';
+  const vs = (c.mid && mediaURL[c.mid] && (st === 'read' || st === 'shadow' || sess.rev)) ? '<div id="vslot" class="vslot"></div>' : '';
   if (st === 'listen') body = `<div class="ico">🎧</div><div class="mut">專心聽，字幕隱藏中</div>${sess.rev ? `<div class="fx">${ruby(c.text)}</div><div class="zh">${esc(c.zh)}</div>` : '<button data-act="reveal">偷看字幕</button>'}`;
   if (st === 'read') body = `<div class="fx">${ruby(c.text)}</div><div class="zh">${esc(c.zh)}</div>${c.note ? `<div class="note">${esc(c.note)}</div>` : ''}`;
   if (st === 'shadow') body = `<div class="fx">${ruby(c.text)}</div><div class="zh" style="font-size:16px">${esc(c.zh)}</div>
@@ -279,7 +298,7 @@ function renderSess() {
   if (st === 'hint') body = `<div class="zh">${esc(c.zh)}</div><div class="fx" style="color:var(--mut)">${esc(hint(c))}</div>${sess.rev ? `<div class="fx">${ruby(c.text)}</div>` : '<button data-act="reveal">揭曉</button>'}`;
   if (st === 'recall') body = `<div class="zh" style="font-size:26px">${esc(c.zh)}</div><div class="mut">先在心裡（或開口）說出外文</div>${sess.rev ? `<div class="fx">${ruby(c.text)}</div>` : '<button data-act="reveal">揭曉並播放</button>'}`;
   const blocked = (st === 'hint' || st === 'recall') && !sess.rev;
-  el.innerHTML = head + `<div class="sb">${body}</div><div class="sf"><button data-act="play">🔊</button><button data-act="slow" class="${sess.slow ? 'pri' : ''}">🐢</button><button class="pri sp" data-act="next" ${blocked ? 'style="opacity:.45"' : ''}>${sess.step === S.steps.length - 1 ? '自評 →' : '下一步 →'}</button></div>`;
+  el.innerHTML = head + `<div class="sb">${vs}${body}</div><div class="sf"><button data-act="play">🔊</button><button data-act="slow" class="${sess.slow ? 'pri' : ''}">🐢</button><button class="pri sp" data-act="next" ${blocked ? 'style="opacity:.45"' : ''}>${sess.step === S.steps.length - 1 ? '自評 →' : '下一步 →'}</button></div>`;
 }
 function hint(c) {
   const t = plain(c.text);
@@ -305,7 +324,62 @@ async function toggleRec() {
 let mineAudio = null;
 function playMine(then) {
   if (!sess.myURL) return;
-  speechSynthesis.cancel(); mineAudio = new Audio(sess.myURL); mineAudio.onended = () => then && then(); mineAudio.play().catch(() => {});
+  speechSynthesis.cancel(); stopMedia(); mineAudio = new Audio(sess.myURL); mineAudio.onended = () => then && then(); mineAudio.play().catch(() => {});
+}
+
+/* ---------- media (video/audio clips) ---------- */
+const mediaURL = {};   // mid -> object URL (null = missing)
+let mvTimer = null;
+const getMV = () => document.getElementById('mv');
+async function loadMedia(ids) {
+  for (const id of ids) {
+    if (mediaURL[id] !== undefined && mediaURL[id] !== null) continue;
+    const b = await store.get('media:' + id);
+    mediaURL[id] = b instanceof Blob ? URL.createObjectURL(b) : null;
+  }
+}
+function prepMedia(c) {
+  return new Promise(res => {
+    const v = getMV();
+    if (!c || !c.mid || !mediaURL[c.mid] || v.dataset.id === c.mid) return res();
+    v.dataset.id = c.mid; v.src = mediaURL[c.mid];
+    const done = () => res(); v.addEventListener('loadedmetadata', done, { once: true }); v.addEventListener('error', done, { once: true });
+    v.load(); setTimeout(done, 4000);
+  });
+}
+function stopMedia() { clearTimeout(mvTimer); const v = getMV(); if (v) v.pause(); }
+function parkVideo() { const v = getMV(); if (v && v.parentNode !== document.body) document.body.appendChild(v); if (v) v.classList.remove('in'); }
+function placeVideo() {
+  const v = getMV(), slot = $('#vslot'); if (!v || !slot) return;
+  slot.appendChild(v); v.classList.add('in');
+  if (sess && !sess.finished && !sess.rating) { const c = cur(); if (c && c.mid && v.dataset.id === c.mid && v.paused) { try { v.currentTime = c.t0; } catch (e) {} } }
+}
+function playCard(c) {
+  if (window.speechSynthesis) speechSynthesis.cancel();
+  stopMedia();
+  if (c.mid && mediaURL[c.mid]) {
+    const v = getMV();
+    const go = () => {
+      try { v.currentTime = c.t0; } catch (e) {}
+      v.playbackRate = sess && sess.slow ? 0.7 : 1;
+      const p = v.play(); if (p && p.catch) p.catch(() => {});
+      mvTimer = setTimeout(() => v.pause(), Math.max(300, (c.t1 - c.t0) / v.playbackRate * 1000 + 150));
+    };
+    if (v.dataset.id !== c.mid) { prepMedia(c).then(go); } else go();
+    return Promise.resolve(true);
+  }
+  return speak(c.text, c.lang, rate());
+}
+function parseSRT(s) {
+  const tm = x => { const m = x.trim().match(/(\d+):(\d+):(\d+)[,.](\d+)/); return m ? (+m[1]) * 3600 + (+m[2]) * 60 + (+m[3]) + (+m[4].padEnd(3, '0')) / 1000 : NaN; };
+  return s.replace(/\r/g, '').replace(/^\uFEFF/, '').split(/\n\s*\n/).map(b => {
+    const L = b.split('\n').map(x => x.trim()).filter(x => x !== ''), i = L.findIndex(x => x.includes('-->'));
+    if (i < 0) return null;
+    const [a, z] = L[i].split('-->'), t0 = tm(a), t1 = tm(z);
+    const txt = L.slice(i + 1).map(x => x.replace(/<[^>]+>/g, '').trim()).filter(Boolean);
+    if (!txt.length || isNaN(t0) || isNaN(t1)) return null;
+    return { t0, t1, text: txt[0], zh: txt[1] || '', note: txt.slice(2).join(' ') };
+  }).filter(Boolean);
 }
 
 /* ---------- actions ---------- */
@@ -314,14 +388,14 @@ const acts = {
   lang: b => { S.lang = b.dataset.k; save(); render(); },
   goal: b => { S.goal = Math.min(30, Math.max(1, S.goal + +b.dataset.d)); save(); render(); },
   start: startSession,
-  exit: () => { speechSynthesis.cancel(); if (sess && sess.rec) sess.rec.stop(); sess = null; $('#sess').classList.remove('on'); render(); },
-  again: () => { sess = null; startSession(); if (!sess) acts.exit(); },
-  play: () => speak(cur().text, cur().lang, rate()),
-  slow: () => { sess.slow = !sess.slow; renderSess(); speak(cur().text, cur().lang, rate()); },
-  reveal: () => { sess.rev = true; renderSess(); speak(cur().text, cur().lang, rate()); },
+  exit: () => { speechSynthesis.cancel(); stopMedia(); parkVideo(); if (sess && sess.rec) sess.rec.stop(); sess = null; $('#sess').classList.remove('on'); render(); },
+  again: async () => { sess = null; await startSession(); if (!sess) acts.exit(); },
+  play: () => playCard(cur()),
+  slow: () => { sess.slow = !sess.slow; renderSess(); playCard(cur()); },
+  reveal: () => { sess.rev = true; renderSess(); playCard(cur()); },
   rec: toggleRec,
   playMine: () => playMine(),
-  playAB: () => playMine(() => speak(cur().text, cur().lang, rate())),
+  playAB: () => playMine(() => playCard(cur())),
   next: () => {
     const st = S.steps[sess.step];
     if ((st === 'hint' || st === 'recall') && !sess.rev) return acts.reveal();
@@ -336,7 +410,11 @@ const acts = {
     if (sess.i >= sess.q.length) { sess.finished = true; renderSess(); } else enterStep(true);
   },
   del: b => {
-    if (S.confirmDel === b.dataset.id) { S.cards = S.cards.filter(c => c.id !== b.dataset.id); S.confirmDel = null; save(); } else S.confirmDel = b.dataset.id;
+    if (S.confirmDel === b.dataset.id) {
+      const gone = S.cards.find(c => c.id === b.dataset.id);
+      S.cards = S.cards.filter(c => c.id !== b.dataset.id); S.confirmDel = null; save();
+      if (gone && gone.mid && !S.cards.some(c => c.mid === gone.mid)) { store.del('media:' + gone.mid); if (mediaURL[gone.mid]) URL.revokeObjectURL(mediaURL[gone.mid]); delete mediaURL[gone.mid]; }
+    } else S.confirmDel = b.dataset.id;
     render();
   },
   import: () => {
@@ -344,6 +422,26 @@ const acts = {
     let n = 0;
     for (const l of lines) { const p = l.split(/\s*[|｜\t]\s*/); if (p.length >= 2 && p[0] && p[1]) { S.cards.push(newCard(lang, p[0], p[1], p[2] || '')); n++; } }
     save(); render(); $('#impMsg').textContent = n ? `已匯入 ${n} 句` : '沒有可匯入的行，請用「外文 | 中文」格式';
+  },
+  impLang: b => { impLang = b.value; },
+  importMedia: async () => {
+    const msg = () => $('#mvMsg'), lang = $('#impLang').value, mf = $('#mvFile').files[0], sf = $('#srtFile').files[0];
+    let txt = $('#srtText').value.trim();
+    if (!txt && sf) { try { txt = await sf.text(); } catch (e) {} }
+    if (!mf) { msg().textContent = '請先選擇影片或音檔'; return; }
+    if (!txt) { msg().textContent = '請選擇字幕檔，或把字幕內容貼進來'; return; }
+    const cues = parseSRT(txt);
+    if (!cues.length) { msg().textContent = '讀不到字幕，請確認是 SRT 格式'; return; }
+    msg().textContent = '儲存中…';
+    const mid = uid();
+    if (!(await store.setBlob('media:' + mid, mf))) { msg().textContent = '無法儲存影片（手機空間不足或瀏覽器不支援）'; return; }
+    let added = 0, linked = 0;
+    for (const q of cues) {
+      const ex = S.cards.find(c => c.lang === lang && c.text.trim() === q.text && !c.mid);
+      if (ex) { ex.mid = mid; ex.t0 = q.t0; ex.t1 = q.t1; if (!ex.zh) ex.zh = q.zh; if (!ex.note) ex.note = q.note; linked++; }
+      else { S.cards.push(newCard(lang, q.text, q.zh, q.note, { mid, t0: q.t0, t1: q.t1 })); added++; }
+    }
+    save(); render(); $('#mvMsg').textContent = `已匯入：新增 ${added} 句，連結既有句子 ${linked} 句`;
   },
   prompt: async () => {
     const lang = $('#impLang').value, n = LANG[lang].name;
