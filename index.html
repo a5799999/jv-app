@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>日越跟讀</title>
+<link rel="manifest" href="manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="日越跟讀">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-192.png">
+<meta name="theme-color" content="#0f172a">
+<style>
+:root{--bg:#0f172a;--card:#1e293b;--card2:#273449;--tx:#f1f5f9;--mut:#94a3b8;--acc:#f5a524;--ok:#34d399;--bad:#f87171;--ja:#fb7185;--vi:#38bdf8;--r:16px}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--tx);font-family:-apple-system,BlinkMacSystemFont,"PingFang TC","Hiragino Sans","Noto Sans TC",sans-serif}
+body{overflow:hidden}
+button{font:inherit;color:inherit;border:0;background:var(--card2);border-radius:12px;padding:12px 16px;cursor:pointer}
+button:active{transform:scale(.97)}
+button:disabled{opacity:.4}
+button.pri{background:var(--acc);color:#1b1304;font-weight:700}
+button.ghost{background:transparent;color:var(--mut)}
+button.sm{padding:6px 12px;font-size:13px;border-radius:10px}
+button.danger{background:#7f1d1d}
+textarea,select,input[type=text]{width:100%;background:var(--card2);color:var(--tx);border:1px solid #334155;border-radius:12px;padding:10px;font:inherit;font-size:16px}
+textarea{min-height:110px;resize:vertical}
+#app{position:fixed;inset:0;display:flex;flex-direction:column}
+main{flex:1;overflow-y:auto;padding:calc(env(safe-area-inset-top) + 16px) 16px 16px;-webkit-overflow-scrolling:touch}
+nav{display:flex;background:#0b1222;border-top:1px solid #1e293b;padding-bottom:env(safe-area-inset-bottom)}
+nav button{flex:1;background:none;border-radius:0;padding:12px 4px;color:var(--mut);font-size:12px;display:flex;flex-direction:column;align-items:center;gap:2px}
+nav button b{font-size:20px;font-weight:400}
+nav button.on{color:var(--acc)}
+h1{font-size:22px;margin:0 0 14px}
+h2{font-size:15px;color:var(--mut);margin:20px 0 8px;font-weight:600}
+.card{background:var(--card);border-radius:var(--r);padding:16px;margin-bottom:12px}
+.row{display:flex;gap:8px;align-items:center}
+.sp{flex:1}
+.chips{display:flex;gap:8px;margin-bottom:14px}
+.chip{padding:8px 16px;border-radius:99px;background:var(--card);color:var(--mut);font-size:14px}
+.chip.on{background:var(--acc);color:#1b1304;font-weight:700}
+.big{font-size:44px;font-weight:800;line-height:1}
+.mut{color:var(--mut);font-size:13px}
+.tag{font-size:11px;font-weight:700;padding:2px 7px;border-radius:6px;color:#0f172a}
+.tag.ja{background:var(--ja)}.tag.vi{background:var(--vi)}
+.stepper{display:flex;align-items:center;gap:14px}
+.stepper b{font-size:26px;min-width:34px;text-align:center}
+.item{background:var(--card);border-radius:14px;padding:12px 14px;margin-bottom:8px}
+.item .t{font-size:17px;margin:6px 0 2px}
+.bars{display:flex;align-items:flex-end;gap:5px;height:80px}
+.bars i{flex:1;background:var(--acc);border-radius:4px 4px 0 0;min-height:3px;opacity:.9}
+.bars i.z{background:#334155}
+.kv{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.kv .card{margin:0;text-align:center}
+.switch{display:flex;justify-content:space-between;align-items:center;padding:8px 0}
+.switch input{width:22px;height:22px;accent-color:var(--acc)}
+/* session */
+#sess{position:fixed;inset:0;background:var(--bg);display:none;flex-direction:column;z-index:10;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+#sess.on{display:flex}
+.sh{display:flex;align-items:center;gap:10px;padding:12px 16px}
+.pbar{height:4px;background:#1e293b;margin:0 16px;border-radius:4px;overflow:hidden}
+.pbar i{display:block;height:100%;background:var(--acc);transition:width .3s}
+.sb{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;text-align:center;gap:16px;overflow-y:auto}
+.sb .fx{font-size:30px;line-height:1.7;font-weight:600;word-break:break-word}
+.sb .fx rt{font-size:12px;color:var(--acc);font-weight:500}
+.sb .zh{font-size:20px;color:var(--acc)}
+.sb .note{font-size:14px;color:var(--mut)}
+.sb .ico{font-size:64px}
+.sf{display:flex;gap:10px;padding:12px 16px 16px}
+.sf button{padding:16px}
+.rate{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:12px 16px 16px;width:100%}
+.rate button{display:flex;flex-direction:column;gap:2px;font-weight:700}
+.rate button small{font-weight:400;font-size:11px;opacity:.8}
+.rec{background:#7f1d1d}
+.pulse{animation:p 1s infinite}
+@keyframes p{50%{opacity:.5}}
+.warn{background:#422006;color:#fed7aa;border-radius:12px;padding:10px 12px;font-size:13px;margin-bottom:12px}
+</style>
+</head>
+<body>
+<div id="app">
+  <main id="view"></main>
+  <nav id="nav"></nav>
+</div>
+<div id="sess"></div>
+
+<script>
+'use strict';
+/* ---------- helpers ---------- */
+const $ = (s, r = document) => r.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const LANG = { ja: { name: '日文', tag: 'JA', bcp: 'ja-JP' }, vi: { name: '越文', tag: 'VI', bcp: 'vi-VN' } };
+const STEPS = { listen: '盲聽', read: '看字幕', shadow: '跟讀', hint: '首字回想', recall: '看中文回想' };
+const STEP_ORDER = ['listen', 'read', 'shadow', 'hint', 'recall'];
+const RB = /([一-鿿々〆]+)\{([^}]+)\}/g;       // 漢字{かんじ}
+const plain = t => t.replace(RB, '$1');
+const ruby = t => esc(t).replace(RB, '<ruby>$1<rt>$2</rt></ruby>');
+const today = () => { const d = new Date(); return Math.floor((d.getTime() - d.getTimezoneOffset() * 6e4) / 864e5); };
+const uid = () => Math.random().toString(36).slice(2, 10);
+
+/* ---------- storage (IndexedDB, localStorage fallback) ---------- */
+const store = {
+  db: null,
+  open() { return new Promise(res => { try { const r = indexedDB.open('jvapp', 1); r.onupgradeneeded = () => r.result.createObjectStore('kv'); r.onsuccess = () => { this.db = r.result; res(); }; r.onerror = () => res(); } catch (e) { res(); } }); },
+  get(k) { return new Promise(res => {
+    if (!this.db) { try { res(JSON.parse(localStorage.getItem(k))); } catch (e) { res(null); } return; }
+    const q = this.db.transaction('kv').objectStore('kv').get(k); q.onsuccess = () => res(q.result ?? null); q.onerror = () => res(null); }); },
+  set(k, v) { return new Promise(res => {
+    if (!this.db) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} res(); return; }
+    const t = this.db.transaction('kv', 'readwrite'); t.objectStore('kv').put(v, k); t.oncomplete = () => res(); t.onerror = () => res(); }); }
+};
+
+/* ---------- starter content ---------- */
+const SEED = [
+  ['ja', 'はじめまして、マイクと申{もう}します。', '初次見面，我叫 Mike。'],
+  ['ja', 'こちらが見積書{みつもりしょ}です。', '這是報價單。'],
+  ['ja', '納期{のうき}はいつ頃{ごろ}になりますか。', '交期大概什麼時候？'],
+  ['ja', 'もう少{すこ}し安{やす}くなりませんか。', '可以再便宜一點嗎？'],
+  ['ja', 'サンプルを送{おく}っていただけますか。', '可以請你寄樣品給我嗎？'],
+  ['ja', '品質{ひんしつ}に問題{もんだい}がありました。', '品質出了問題。'],
+  ['ja', '確認{かくにん}して、後{あと}で連絡{れんらく}します。', '我確認一下，稍後再聯絡您。'],
+  ['ja', 'ありがとうございます。よろしくお願{ねが}いします。', '謝謝，請多關照。'],
+  ['ja', 'これはいくらですか。', '這個多少錢？'],
+  ['ja', 'トイレはどこですか。', '廁所在哪裡？'],
+  ['vi', 'Xin chào, tôi là Mike.', '你好，我是 Mike。'],
+  ['vi', 'Đây là bảng báo giá.', '這是報價單。'],
+  ['vi', 'Khi nào giao hàng được?', '什麼時候可以交貨？'],
+  ['vi', 'Có thể giảm giá thêm một chút không?', '可以再便宜一點嗎？'],
+  ['vi', 'Anh gửi mẫu cho tôi được không?', '你可以寄樣品給我嗎？'],
+  ['vi', 'Sản phẩm này có vấn đề về chất lượng.', '這個產品有品質問題。'],
+  ['vi', 'Tôi sẽ kiểm tra rồi liên hệ lại với anh.', '我確認後再聯絡你。'],
+  ['vi', 'Cảm ơn anh. Mong được hợp tác.', '謝謝。期待合作。'],
+  ['vi', 'Cái này giá bao nhiêu?', '這個多少錢？'],
+  ['vi', 'Nhà vệ sinh ở đâu?', '廁所在哪裡？']
+];
+const newCard = (lang, text, zh, note = '') => ({ id: uid(), lang, text, zh, note, ease: 2.5, interval: 0, reps: 0, due: 0, isNew: true });
+
+/* ---------- state ---------- */
+let S = null, view = 'home', sess = null, voices = [];
+const save = () => store.set('state', S);
+const defaults = () => ({ v: 1, cards: SEED.map(a => newCard(...a)), log: {}, goal: 5, rate: 0.9, lang: 'all', steps: [...STEP_ORDER], voice: { ja: '', vi: '' } });
+
+/* ---------- SM-2 ---------- */
+function sm2(c, q) {
+  const n = { ...c };
+  if (q < 3) { n.reps = 0; n.interval = 1; }
+  else { n.reps = c.reps + 1; n.interval = n.reps === 1 ? 1 : n.reps === 2 ? 3 : Math.max(1, Math.round(c.interval * c.ease)); }
+  n.ease = Math.max(1.3, c.ease + (0.1 - (5 - q) * (0.08 + (5 - q) * 0.02)));
+  n.due = today() + n.interval; n.isNew = false;
+  return n;
+}
+const fmtDays = n => n <= 1 ? '1天' : n < 30 ? n + '天' : Math.round(n / 30) + '個月';
+
+/* ---------- queue ---------- */
+function pools() {
+  const t = today(), f = S.cards.filter(c => S.lang === 'all' || c.lang === S.lang);
+  return { due: f.filter(c => !c.isNew && c.due <= t).sort((a, b) => a.due - b.due), nw: f.filter(c => c.isNew), all: f };
+}
+const buildQueue = () => { const p = pools(); return [...p.due, ...p.nw].slice(0, S.goal); };
+function streak() {
+  let d = today(), n = 0;
+  if (!S.log[d]) d--;
+  while (S.log[d] > 0) { n++; d--; }
+  return n;
+}
+
+/* ---------- speech ---------- */
+function loadVoices() { voices = window.speechSynthesis ? speechSynthesis.getVoices() : []; }
+if (window.speechSynthesis) { loadVoices(); speechSynthesis.onvoiceschanged = () => { loadVoices(); if (view === 'settings') render(); }; }
+function pickVoice(lang) {
+  const code = LANG[lang].bcp.split('-')[0], list = voices.filter(v => v.lang.toLowerCase().startsWith(code));
+  return list.find(v => v.voiceURI === S.voice[lang]) || list[0] || null;
+}
+function speak(text, lang, rate) {
+  return new Promise(res => {
+    if (!window.speechSynthesis) return res(false);
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(plain(text));
+    u.lang = LANG[lang].bcp; const v = pickVoice(lang); if (v) u.voice = v;
+    u.rate = rate; u.onend = () => res(true); u.onerror = () => res(false);
+    speechSynthesis.speak(u);
+  });
+}
+
+/* ---------- views ---------- */
+const NAV = [['home', '🎯', '練習'], ['cards', '📚', '句庫'], ['stats', '📈', '進度'], ['settings', '⚙️', '設定']];
+function render() {
+  $('#nav').innerHTML = NAV.map(([k, i, n]) => `<button data-act="tab" data-k="${k}" class="${view === k ? 'on' : ''}"><b>${i}</b>${n}</button>`).join('');
+  $('#view').innerHTML = ({ home: vHome, cards: vCards, stats: vStats, settings: vSettings })[view]();
+}
+const langChips = () => `<div class="chips">${[['all', '全部'], ['ja', '日文'], ['vi', '越文']].map(([k, n]) => `<div class="chip ${S.lang === k ? 'on' : ''}" data-act="lang" data-k="${k}">${n}</div>`).join('')}</div>`;
+
+function vHome() {
+  const p = pools(), q = Math.min(S.goal, p.due.length + p.nw.length), done = S.log[today()] || 0;
+  return `<h1>日越跟讀</h1>${langChips()}
+  <div class="card"><div class="row"><div><div class="mut">本輪練習</div><div class="big">${q}<span class="mut"> 句</span></div></div><div class="sp"></div>
+    <div style="text-align:right" class="mut">到期複習 ${p.due.length}<br>新句子 ${p.nw.length}<br>今天已練 ${done}</div></div>
+    <div style="height:14px"></div>
+    <button class="pri" style="width:100%;padding:16px;font-size:17px" data-act="start" ${q ? '' : 'disabled'}>${q ? '開始練習' : '今天沒有待練句子 🎉'}</button></div>
+  <div class="card"><div class="row"><div>每輪目標</div><div class="sp"></div><div class="stepper"><button class="sm" data-act="goal" data-d="-1">−</button><b>${S.goal}</b><button class="sm" data-act="goal" data-d="1">＋</button></div></div></div>
+  <div class="mut" style="padding:4px 4px">流程：${S.steps.map(s => STEPS[s]).join(' → ')} → 自評（SM-2 排程）</div>`;
+}
+
+function vCards() {
+  const p = pools(), t = today();
+  const list = p.all.map(c => `<div class="item"><div class="row"><span class="tag ${c.lang}">${LANG[c.lang].tag}</span><span class="mut">${c.isNew ? '新' : c.due <= t ? '到期' : fmtDays(c.due - t) + '後'}</span><div class="sp"></div>
+    <button class="sm ghost" data-act="del" data-id="${c.id}">${S.confirmDel === c.id ? '再點一次刪除' : '刪除'}</button></div>
+    <div class="t">${ruby(c.text)}</div><div class="mut">${esc(c.zh)}${c.note ? ' · ' + esc(c.note) : ''}</div></div>`).join('');
+  return `<h1>句庫</h1>${langChips()}
+  <div class="card"><b>匯入句子</b><div class="mut" style="margin:6px 0 10px">每行一句：外文 | 中文 | 備註（可省略）<br>日文漢字後可加讀音，例如 納期{のうき}はいつですか。</div>
+    <select id="impLang"><option value="ja">日文</option><option value="vi">越文</option></select><div style="height:8px"></div>
+    <textarea id="impText" placeholder="Xin chào | 你好&#10;お願{ねが}いします | 拜託了"></textarea><div style="height:8px"></div>
+    <div class="row"><button class="pri" data-act="import">匯入</button><button data-act="prompt">複製 AI 提示詞</button></div><div class="mut" id="impMsg" style="margin-top:8px"></div></div>
+  <h2>共 ${p.all.length} 句</h2>${list || '<div class="mut">目前沒有句子</div>'}`;
+}
+
+function vStats() {
+  const t = today(), all = S.cards, total = all.length, due = all.filter(c => !c.isNew && c.due <= t).length, mastered = all.filter(c => !c.isNew && c.interval >= 21).length, learning = all.filter(c => !c.isNew).length;
+  const days = Array.from({ length: 14 }, (_, i) => t - 13 + i), max = Math.max(1, ...days.map(d => S.log[d] || 0));
+  return `<h1>進度</h1><div class="kv">
+    <div class="card"><div class="big">${streak()}</div><div class="mut">連續天數</div></div>
+    <div class="card"><div class="big">${S.log[t] || 0}</div><div class="mut">今天練習次數</div></div>
+    <div class="card"><div class="big">${learning}/${total}</div><div class="mut">已學／總句數</div></div>
+    <div class="card"><div class="big" style="color:${due ? 'var(--bad)' : 'var(--ok)'}">${due}</div><div class="mut">到期待複習</div></div></div>
+  <h2>近 14 天</h2><div class="card"><div class="bars">${days.map(d => `<i class="${S.log[d] ? '' : 'z'}" style="height:${Math.round((S.log[d] || 0) / max * 100)}%" title="${S.log[d] || 0}"></i>`).join('')}</div>
+    <div class="row mut" style="margin-top:6px"><span>14 天前</span><div class="sp"></div><span>今天</span></div></div>
+  <div class="mut" style="padding:4px">已熟（間隔 21 天以上）：${mastered} 句</div>`;
+}
+
+function vSettings() {
+  const noVoice = l => !window.speechSynthesis || !voices.some(v => v.lang.toLowerCase().startsWith(l));
+  const sel = l => `<h2>${LANG[l].name}語音</h2>${noVoice(l) ? `<div class="warn">找不到${LANG[l].name}語音。到 iPhone「設定 → 輔助使用 → 朗讀內容 → 聲音」下載${LANG[l].name}語音後，回來重新開啟 App。</div>` : ''}
+    <div class="row"><select id="v_${l}" data-act="voice" data-l="${l}"><option value="">自動</option>${voices.filter(v => v.lang.toLowerCase().startsWith(l)).map(v => `<option value="${esc(v.voiceURI)}" ${S.voice[l] === v.voiceURI ? 'selected' : ''}>${esc(v.name)} (${esc(v.lang)})</option>`).join('')}</select><button data-act="test" data-l="${l}">試聽</button></div>`;
+  return `<h1>設定</h1>
+  <h2>預設語速</h2><div class="chips">${[[0.7, '慢'], [0.9, '正常'], [1.1, '快']].map(([r, n]) => `<div class="chip ${S.rate === r ? 'on' : ''}" data-act="rate" data-r="${r}">${n}</div>`).join('')}</div>
+  <h2>訓練步驟（至少留一個）</h2><div class="card">${STEP_ORDER.map(s => `<label class="switch"><span>${STEPS[s]}</span><input type="checkbox" data-act="step" data-s="${s}" ${S.steps.includes(s) ? 'checked' : ''}></label>`).join('')}</div>
+  ${sel('ja')}${sel('vi')}
+  <h2>備份與還原</h2><div class="card"><div class="mut" style="margin-bottom:8px">資料只存在這支手機的瀏覽器裡。換機或清除網站資料前請先備份。</div>
+    <div class="row"><button data-act="bkShow">顯示備份</button><button data-act="bkCopy">複製備份</button></div><div style="height:8px"></div>
+    <textarea id="bk" placeholder="備份內容會顯示在這裡；要還原就把備份貼進來再按「還原」"></textarea><div style="height:8px"></div>
+    <div class="row"><button class="pri" data-act="bkRestore">還原</button><div class="mut" id="bkMsg"></div></div></div>
+  <h2>危險區</h2><button class="danger" data-act="reset">${S.confirmReset ? '再點一次確認清空全部資料' : '清空全部資料'}</button><div style="height:30px"></div>`;
+}
+
+/* ---------- session ---------- */
+function startSession() {
+  const q = buildQueue(); if (!q.length) return;
+  sess = { q, i: 0, step: 0, rev: false, slow: false, rating: false, done: 0, retry: new Set(), myURL: null, rec: null, recStream: null, recErr: '' };
+  $('#sess').classList.add('on'); enterStep(true);
+}
+const cur = () => sess.q[sess.i];
+const rate = () => sess.slow ? 0.6 : S.rate;
+function enterStep(autoplay) {
+  sess.rev = false; sess.recErr = '';
+  const st = S.steps[sess.step];
+  renderSess();
+  if (autoplay && (st === 'listen' || st === 'read' || st === 'shadow')) speak(cur().text, cur().lang, rate());
+}
+function renderSess() {
+  const el = $('#sess');
+  if (sess.finished) {
+    el.innerHTML = `<div class="sb"><div class="ico">🎉</div><div class="fx" style="font-size:24px">完成 ${sess.done} 句</div><div class="mut">連續 ${streak()} 天</div></div><div class="sf"><button class="pri sp" data-act="exit">回首頁</button><button class="sp" data-act="again">再來一輪</button></div>`; return;
+  }
+  const c = cur(), total = sess.q.length, head = `<div class="sh"><button class="sm ghost" data-act="exit">✕ 離開</button><div class="sp"></div><span class="tag ${c.lang}">${LANG[c.lang].tag}</span><span class="mut">${sess.i + 1}/${total}${sess.rating ? '' : ' · ' + STEPS[S.steps[sess.step]] + ' ' + (sess.step + 1) + '/' + S.steps.length}</span></div>
+    <div class="pbar"><i style="width:${(sess.i + (sess.rating ? 1 : sess.step / S.steps.length)) / total * 100}%"></i></div>`;
+  if (sess.rating) {
+    const b = [[0, '忘了', 'var(--bad)'], [3, '吃力', '#fb923c'], [4, '記得', 'var(--ok)'], [5, '很熟', '#22d3ee']];
+    el.innerHTML = head + `<div class="sb"><div class="fx">${ruby(c.text)}</div><div class="zh">${esc(c.zh)}</div><div class="mut">這句你掌握得如何？</div></div>
+      <div class="rate">${b.map(([q, n, col]) => `<button data-act="grade" data-q="${q}" style="background:${col};color:#0b1222">${n}<small>${fmtDays(sm2(c, q).interval)}後</small></button>`).join('')}</div>`; return;
+  }
+  const st = S.steps[sess.step]; let body = '';
+  if (st === 'listen') body = `<div class="ico">🎧</div><div class="mut">專心聽，字幕隱藏中</div>${sess.rev ? `<div class="fx">${ruby(c.text)}</div><div class="zh">${esc(c.zh)}</div>` : '<button data-act="reveal">偷看字幕</button>'}`;
+  if (st === 'read') body = `<div class="fx">${ruby(c.text)}</div><div class="zh">${esc(c.zh)}</div>${c.note ? `<div class="note">${esc(c.note)}</div>` : ''}`;
+  if (st === 'shadow') body = `<div class="fx">${ruby(c.text)}</div><div class="zh" style="font-size:16px">${esc(c.zh)}</div>
+    <div class="row"><button class="${sess.rec ? 'rec pulse' : ''}" data-act="rec" style="padding:16px 24px">${sess.rec ? '⏹ 停止錄音' : '🎙 錄音'}</button></div>
+    ${sess.myURL && !sess.rec ? `<div class="row"><button data-act="playMine">▶ 我的</button><button data-act="play">▶ 原音</button><button data-act="playAB">我的→原音</button></div>` : ''}
+    ${sess.recErr ? `<div class="warn">${esc(sess.recErr)}</div>` : '<div class="mut">錄完後先聽自己，再聽原音，一次只比較節奏、重音或聲調中的一項</div>'}`;
+  if (st === 'hint') body = `<div class="zh">${esc(c.zh)}</div><div class="fx" style="color:var(--mut)">${esc(hint(c))}</div>${sess.rev ? `<div class="fx">${ruby(c.text)}</div>` : '<button data-act="reveal">揭曉</button>'}`;
+  if (st === 'recall') body = `<div class="zh" style="font-size:26px">${esc(c.zh)}</div><div class="mut">先在心裡（或開口）說出外文</div>${sess.rev ? `<div class="fx">${ruby(c.text)}</div>` : '<button data-act="reveal">揭曉並播放</button>'}`;
+  const blocked = (st === 'hint' || st === 'recall') && !sess.rev;
+  el.innerHTML = head + `<div class="sb">${body}</div><div class="sf"><button data-act="play">🔊</button><button data-act="slow" class="${sess.slow ? 'pri' : ''}">🐢</button><button class="pri sp" data-act="next" ${blocked ? 'style="opacity:.45"' : ''}>${sess.step === S.steps.length - 1 ? '自評 →' : '下一步 →'}</button></div>`;
+}
+function hint(c) {
+  const t = plain(c.text);
+  return c.lang === 'vi' ? t.split(/\s+/).map(w => w[0] + (w.length > 1 ? '…' : '')).join(' ') : t.slice(0, 3) + '…';
+}
+async function toggleRec() {
+  if (sess.rec) { sess.rec.stop(); return; }
+  try {
+    if (!navigator.mediaDevices || !window.MediaRecorder) throw new Error('此瀏覽器不支援錄音');
+    speechSynthesis.cancel();
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const mt = ['audio/mp4', 'audio/webm'].find(t => MediaRecorder.isTypeSupported(t));
+    const rec = new MediaRecorder(stream, mt ? { mimeType: mt } : undefined), chunks = [];
+    rec.ondataavailable = e => e.data.size && chunks.push(e.data);
+    rec.onstop = () => {
+      stream.getTracks().forEach(t => t.stop());
+      if (sess.myURL) URL.revokeObjectURL(sess.myURL);
+      sess.myURL = chunks.length ? URL.createObjectURL(new Blob(chunks, { type: rec.mimeType })) : null; sess.rec = null; renderSess();
+    };
+    rec.start(); sess.rec = rec; sess.recErr = ''; renderSess();
+  } catch (e) { sess.rec = null; sess.recErr = '無法錄音：請在 iPhone 允許麥克風（Safari 網站設定），並用 https 網址開啟。'; renderSess(); }
+}
+let mineAudio = null;
+function playMine(then) {
+  if (!sess.myURL) return;
+  speechSynthesis.cancel(); mineAudio = new Audio(sess.myURL); mineAudio.onended = () => then && then(); mineAudio.play().catch(() => {});
+}
+
+/* ---------- actions ---------- */
+const acts = {
+  tab: b => { view = b.dataset.k; S.confirmDel = S.confirmReset = null; render(); $('#view').scrollTop = 0; },
+  lang: b => { S.lang = b.dataset.k; save(); render(); },
+  goal: b => { S.goal = Math.min(30, Math.max(1, S.goal + +b.dataset.d)); save(); render(); },
+  start: startSession,
+  exit: () => { speechSynthesis.cancel(); if (sess && sess.rec) sess.rec.stop(); sess = null; $('#sess').classList.remove('on'); render(); },
+  again: () => { sess = null; startSession(); if (!sess) acts.exit(); },
+  play: () => speak(cur().text, cur().lang, rate()),
+  slow: () => { sess.slow = !sess.slow; renderSess(); speak(cur().text, cur().lang, rate()); },
+  reveal: () => { sess.rev = true; renderSess(); speak(cur().text, cur().lang, rate()); },
+  rec: toggleRec,
+  playMine: () => playMine(),
+  playAB: () => playMine(() => speak(cur().text, cur().lang, rate())),
+  next: () => {
+    const st = S.steps[sess.step];
+    if ((st === 'hint' || st === 'recall') && !sess.rev) return acts.reveal();
+    if (sess.rec) sess.rec.stop();
+    if (sess.step < S.steps.length - 1) { sess.step++; enterStep(true); } else { sess.rating = true; speechSynthesis.cancel(); renderSess(); }
+  },
+  grade: b => {
+    const q = +b.dataset.q, c = cur(), i = S.cards.findIndex(x => x.id === c.id);
+    S.cards[i] = sm2(c, q); S.log[today()] = (S.log[today()] || 0) + 1; sess.done++;
+    if (q < 3 && !sess.retry.has(c.id)) { sess.retry.add(c.id); sess.q.push(S.cards[i]); }
+    save(); sess.rating = false; sess.step = 0; sess.i++;
+    if (sess.i >= sess.q.length) { sess.finished = true; renderSess(); } else enterStep(true);
+  },
+  del: b => {
+    if (S.confirmDel === b.dataset.id) { S.cards = S.cards.filter(c => c.id !== b.dataset.id); S.confirmDel = null; save(); } else S.confirmDel = b.dataset.id;
+    render();
+  },
+  import: () => {
+    const lang = $('#impLang').value, lines = $('#impText').value.split('\n').map(s => s.trim()).filter(Boolean);
+    let n = 0;
+    for (const l of lines) { const p = l.split(/\s*[|｜\t]\s*/); if (p.length >= 2 && p[0] && p[1]) { S.cards.push(newCard(lang, p[0], p[1], p[2] || '')); n++; } }
+    save(); render(); $('#impMsg').textContent = n ? `已匯入 ${n} 句` : '沒有可匯入的行，請用「外文 | 中文」格式';
+  },
+  prompt: async () => {
+    const lang = $('#impLang').value, n = LANG[lang].name;
+    const p = `請幫我產生 10 句實用的${n}句子，主題：＿＿＿＿（例如：工廠現場、報價與交期、日常生活）。\n格式：每行一句，用「|」分隔：${n}原文 | 繁體中文翻譯 | 備註（可省略）\n${lang === 'ja' ? '日文的漢字後面請用大括號標讀音，例如：納期{のうき}はいつですか。' : '越文請保留完整聲調符號，備註可寫北越或南越的說法差異。'}\n只輸出句子，不要編號，不要其他說明。`;
+    try { await navigator.clipboard.writeText(p); $('#impMsg').textContent = '提示詞已複製，貼給 Claude，再把結果貼回上面匯入'; } catch (e) { $('#impText').value = p; $('#impMsg').textContent = '無法自動複製，已放進輸入框，請手動複製'; }
+  },
+  rate: b => { S.rate = +b.dataset.r; save(); render(); },
+  step: b => {
+    const s = b.dataset.s, on = S.steps.includes(s);
+    if (on && S.steps.length === 1) { b.checked = true; return; }
+    S.steps = STEP_ORDER.filter(x => (x === s ? !on : S.steps.includes(x))); save(); render();
+  },
+  voice: b => { S.voice[b.dataset.l] = b.value; save(); },
+  test: b => { const l = b.dataset.l; speak(l === 'ja' ? 'こんにちは。よろしくお願いします。' : 'Xin chào. Rất vui được gặp anh.', l, S.rate); },
+  bkShow: () => { $('#bk').value = JSON.stringify(S); },
+  bkCopy: async () => { $('#bk').value = JSON.stringify(S); try { await navigator.clipboard.writeText($('#bk').value); $('#bkMsg').textContent = '已複製'; } catch (e) { $('#bk').select(); $('#bkMsg').textContent = '請手動全選複製'; } },
+  bkRestore: () => {
+    try { const d = JSON.parse($('#bk').value); if (!Array.isArray(d.cards)) throw 0; S = Object.assign(defaults(), d); save(); render(); }
+    catch (e) { $('#bkMsg').textContent = '備份內容無法讀取'; }
+  },
+  reset: () => { if (S.confirmReset) { S = defaults(); save(); view = 'home'; } else S.confirmReset = true; render(); }
+};
+document.addEventListener('click', e => { const b = e.target.closest('[data-act]'); if (b && b.tagName !== 'INPUT' && b.tagName !== 'SELECT' && acts[b.dataset.act]) acts[b.dataset.act](b); });
+document.addEventListener('change', e => { const b = e.target.closest('[data-act]'); if (b && (b.tagName === 'INPUT' || b.tagName === 'SELECT') && acts[b.dataset.act]) acts[b.dataset.act](b); });
+
+/* ---------- boot ---------- */
+(async () => {
+  await store.open();
+  S = await store.get('state');
+  if (!S || !Array.isArray(S.cards)) { S = defaults(); await save(); }
+  S = Object.assign(defaults(), S, { cards: S.cards });
+  try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch (e) {}
+  render();
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+})();
+</script>
+</body>
+</html>
