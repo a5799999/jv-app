@@ -224,8 +224,8 @@ function vCards() {
     <textarea id="impText" placeholder="Xin chào | 你好&#10;お願{ねが}いします | 拜託了"></textarea><div style="height:8px"></div>
     <div class="row"><button class="pri" data-act="import">匯入</button><button data-act="prompt">複製 AI 提示詞</button></div><div class="mut" id="impMsg" style="margin-top:8px"></div></div>
   <div class="card"><b>影片／音檔＋字幕（SRT）</b><div class="mut" style="margin:6px 0 8px">跟讀時會播放影片裡的真人原音。語言用上面的選項。字幕每則：第 1 行外文、第 2 行中文、第 3 行備註（可省略）。已有的相同句子會直接連結，進度保留。</div>
-    <div class="mut">① 選影片或音檔</div><input type="file" id="mvFile" accept="video/*,audio/*">
-    <div class="mut">② 選字幕檔，或貼上內容</div><input type="file" id="srtFile"><textarea id="srtText" placeholder="1&#10;00:00:05,000 --> 00:00:08,000&#10;Xin chào&#10;你好"></textarea><div style="height:8px"></div>
+    <div class="mut">① 選影片或音檔（可多選）</div><input type="file" id="mvFile" accept="video/*,audio/*" multiple>
+    <div class="mut">② 選字幕檔（可多選，檔名含 EP 數字會自動配對），或貼上內容</div><input type="file" id="srtFile" multiple><textarea id="srtText" placeholder="1&#10;00:00:05,000 --> 00:00:08,000&#10;Xin chào&#10;你好"></textarea><div style="height:8px"></div>
     <button class="pri" data-act="importMedia">匯入影片＋字幕</button><div class="mut" id="mvMsg" style="margin-top:8px"></div></div>
   <h2>共 ${p.all.length} 句</h2>${list || '<div class="mut">目前沒有句子</div>'}`;
 }
@@ -425,23 +425,39 @@ const acts = {
   },
   impLang: b => { impLang = b.value; },
   importMedia: async () => {
-    const msg = () => $('#mvMsg'), lang = $('#impLang').value, mf = $('#mvFile').files[0], sf = $('#srtFile').files[0];
-    let txt = $('#srtText').value.trim();
-    if (!txt && sf) { try { txt = await sf.text(); } catch (e) {} }
-    if (!mf) { msg().textContent = '請先選擇影片或音檔'; return; }
-    if (!txt) { msg().textContent = '請選擇字幕檔，或把字幕內容貼進來'; return; }
-    const cues = parseSRT(txt);
-    if (!cues.length) { msg().textContent = '讀不到字幕，請確認是 SRT 格式'; return; }
-    msg().textContent = '儲存中…';
-    const mid = uid();
-    if (!(await store.setBlob('media:' + mid, mf))) { msg().textContent = '無法儲存影片（手機空間不足或瀏覽器不支援）'; return; }
-    let added = 0, linked = 0;
-    for (const q of cues) {
-      const ex = S.cards.find(c => c.lang === lang && c.text.trim() === q.text && !c.mid);
-      if (ex) { ex.mid = mid; ex.t0 = q.t0; ex.t1 = q.t1; if (!ex.zh) ex.zh = q.zh; if (!ex.note) ex.note = q.note; linked++; }
-      else { S.cards.push(newCard(lang, q.text, q.zh, q.note, { mid, t0: q.t0, t1: q.t1 })); added++; }
+    const msg = t => { $('#mvMsg').textContent = t; }, lang = $('#impLang').value;
+    const mfs = [...$('#mvFile').files], sfs = [...$('#srtFile').files];
+    const pasted = $('#srtText').value.trim();
+    if (!mfs.length) { msg('請先選擇影片或音檔'); return; }
+    const key = n => { const m = /EP\s*0*(\d+)/i.exec(n); return m ? 'ep' + m[1] : n.replace(/\.[^.]+$/, '').toLowerCase(); };
+    const pairs = [];
+    if (pasted) { if (mfs.length > 1) { msg('貼上字幕時一次只能選一支影片'); return; } pairs.push([mfs[0], pasted]); }
+    else {
+      if (!sfs.length) { msg('請選擇字幕檔，或把字幕內容貼進來'); return; }
+      for (const mf of mfs) {
+        const sf = (mfs.length === 1 && sfs.length === 1) ? sfs[0] : sfs.find(f => key(f.name) === key(mf.name));
+        if (!sf) { pairs.push([mf, null]); continue; }
+        let t = ''; try { t = await sf.text(); } catch (e) {}
+        pairs.push([mf, t]);
+      }
     }
-    save(); render(); $('#mvMsg').textContent = `已匯入：新增 ${added} 句，連結既有句子 ${linked} 句`;
+    let added = 0, linked = 0, ok = 0; const bad = [];
+    for (let i = 0; i < pairs.length; i++) {
+      const [mf, txt] = pairs[i];
+      msg(`儲存中 ${i + 1}/${pairs.length}：${mf.name}`);
+      const cues = txt ? parseSRT(txt) : [];
+      if (!cues.length) { bad.push(mf.name + '（找不到對應字幕）'); continue; }
+      const mid = uid();
+      if (!(await store.setBlob('media:' + mid, mf))) { bad.push(mf.name + '（儲存失敗，空間不足？）'); continue; }
+      for (const q of cues) {
+        const ex = S.cards.find(c => c.lang === lang && c.text.trim() === q.text && !c.mid);
+        if (ex) { ex.mid = mid; ex.t0 = q.t0; ex.t1 = q.t1; if (!ex.zh) ex.zh = q.zh; if (!ex.note) ex.note = q.note; linked++; }
+        else { S.cards.push(newCard(lang, q.text, q.zh, q.note, { mid, t0: q.t0, t1: q.t1 })); added++; }
+      }
+      ok++; save();
+    }
+    save(); render();
+    $('#mvMsg').textContent = `已匯入 ${ok} 支影片：新增 ${added} 句，連結既有句子 ${linked} 句` + (bad.length ? `。未完成：${bad.join('、')}` : '');
   },
   prompt: async () => {
     const lang = $('#impLang').value, n = LANG[lang].name;
